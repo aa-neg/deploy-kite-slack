@@ -1,0 +1,51 @@
+service: 
+  name: deploy-kite 
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  region: us-west-2 
+  stage: prod # we are cowboys (can set-up another channel as dev in the future)
+  timeout: 30 
+  cfLogs: true
+
+package:
+  individually: true
+  exclude:
+    - ./**
+
+#Note serverless converts dashes to the literal word Dash
+resources:
+  Resources:
+    DeployKiteHandlerLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        RetentionInDays: "14"
+
+functions:
+  success-notifier:
+    handler: functions/success-notifier/index.handler
+    environment:
+      SLACK_WEBHOOK: ${file(./config.${self:provider.stage}.json):SLACK_WEBHOOK} 
+      FOOTER_ICON_URL:  ${file(./config.${self:provider.stage}.json):FOOTER_ICON_URL}
+      SNS_SUBJECT:  ${file(./config.${self:provider.stage}.json):SNS_SUBJECT}
+    package:
+      include:
+        - functions/success-notifier/index.js
+        - node_modules/**
+    events:
+      - sns: 
+          arn: ${file(./config.${self:provider.stage}.json):SNS_ARN}
+  redeploy-hook:
+    handler: functions/redeploy-hook/index.handler
+    environment:
+      SQS_DEPLOY_QUEUE:  ${file(./config.${self:provider.stage}.json):SQS_DEPLOY_QUEUE}
+    package:
+      include:
+        - functions/redeploy-hook/index.js
+        - node_modules/**
+    events:
+      - http:
+          path: /redeploy-hook
+          method: post
+          cors: true
