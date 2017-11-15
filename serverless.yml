@@ -8,6 +8,7 @@ provider:
   stage: prod # we are cowboys (can set-up another channel as dev in the future)
   timeout: 30 
   cfLogs: true
+  role: ${file(./config.${self:provider.stage}.json):ROLE}
 
 package:
   individually: true
@@ -26,13 +27,13 @@ functions:
   success-notifier:
     handler: functions/success-notifier/index.handler
     environment:
-      SLACK_WEBHOOK: ${file(./config.${self:provider.stage}.json):SLACK_WEBHOOK} 
+      SLACK_WEBHOOK_PATH: ${file(./config.${self:provider.stage}.json):SLACK_WEBHOOK_PATH} 
       FOOTER_ICON_URL:  ${file(./config.${self:provider.stage}.json):FOOTER_ICON_URL}
       SNS_SUBJECT:  ${file(./config.${self:provider.stage}.json):SNS_SUBJECT}
     package:
       include:
         - functions/success-notifier/index.js
-        - node_modules/**
+        - utils/request.js
     events:
       - sns: 
           arn: ${file(./config.${self:provider.stage}.json):SNS_ARN}
@@ -40,12 +41,20 @@ functions:
     handler: functions/redeploy-hook/index.handler
     environment:
       SQS_DEPLOY_QUEUE:  ${file(./config.${self:provider.stage}.json):SQS_DEPLOY_QUEUE}
+      FOOTER_ICON_URL:  ${file(./config.${self:provider.stage}.json):FOOTER_ICON_URL}
     package:
       include:
         - functions/redeploy-hook/index.js
-        - node_modules/**
+        - utils/request.js
+  slack-hop:
+    handler: functions/slack-hop/index.handler
+    environment:
+      HOP_FUNCTION:  ${file(./config.${self:provider.stage}.json):HOP_FUNCTION}
+    package:
+      include:
+        - functions/slack-hop/index.js
     events:
       - http:
-          path: /redeploy-hook
+          path: /slack-hop
           method: post
           cors: true

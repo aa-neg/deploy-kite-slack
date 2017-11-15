@@ -1,10 +1,11 @@
-const request = require('request-promise')
+const request = require('../../utils/request')
 const baseSlackPath = 'https://hooks.slack.com/services'
 const baseRepoUrl = 'https://github.com/siteminder-au/'
 const baseBuildKiteUrl = 'https://buildkite.com/siteminder/'
+const baseSlackUrl = 'hooks.slack.com'
 
 const footerIconUrl = process.env.FOOTER_ICON_URL
-const slackWebhook = process.env.SLACK_WEBHOOK
+const slackWebhookPath = process.env.SLACK_WEBHOOK_PATH
 const desiredSubject = process.env.SNS_SUBJECT
 
 const constructRepoLink = application => {
@@ -123,12 +124,14 @@ exports.handler = (event, context, callback) => {
   } else {
     const parsedMessage = JSON.parse(snsEvent.Message)
 
-    return request({
-      method: 'POST',
-      uri: `${slackWebhook}`,
-      body: generateSlackMessage(parsedMessage.error, parsedMessage.payload),
-      json: true
-    })
+    return request
+      .post(
+        {
+          hostname: baseSlackUrl,
+          path: slackWebhookPath
+        },
+        generateSlackMessage(parsedMessage.error, parsedMessage.payload)
+      )
       .then(result => {
         callback()
       })
