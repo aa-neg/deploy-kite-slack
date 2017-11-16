@@ -20,19 +20,58 @@ const constructCallbackId = () => {
   return 'test123'
 }
 
+const determineTitle = (failureText, slackstate) => {
+  if (failureText) {
+    if (slackstate.redeployment) {
+      return `Failed to redeploy ${slackstate.timestamp}`
+    } else {
+      return `Failed to deploy`
+    }
+  } else {
+    if (slackstate.redeployment) {
+      return `Successfully redeployed ${slackstate.timestamp}`
+    } else {
+      return `Successfully deployed`
+    }
+  }
+}
+
+const determimeColour = (failureText, slackstate) => {
+  if (failureText) {
+    if (slackstate.redeployment) {
+      return '#ff9605'
+    } else {
+      return '#FF0000'
+    }
+  } else {
+    if (slackstate.redeployment) {
+      return '#cdff05'
+    } else {
+      return '#36a64f'
+    }
+  }
+}
+
 const baseMessage = (
   application,
   buildNumber,
   environment,
+  redeployment,
+  timestamp,
   callbackId,
   failureText
 ) => {
+  const slackstate = {
+    redeployment: redeployment,
+    timestamp: timestamp
+  }
+  console.log('our slack state: ', slackstate)
   const slackMessage = {
     attachments: [
       {
         fallback: `Deployed ${application} ${buildNumber} to ${environment}`,
-        color: failureText ? '#FF0000' : '#36a64f',
-        title: failureText ? 'Failed to deploy!' : 'Successfully deployed',
+        color: determimeColour(failureText, slackstate),
+        title: determineTitle(failureText, slackstate),
         text: failureText,
         callback_id: `${callbackId}`,
         fields: [
@@ -80,6 +119,8 @@ const baseMessage = (
     ]
   }
 
+  console.log('our base slack message: ', slackMessage)
+
   return slackMessage
 }
 
@@ -89,6 +130,8 @@ const generateSlackMessage = (err, payload) => {
       payload.pipeline,
       payload.buildnumber,
       payload.env,
+      payload.redeployment,
+      payload.timestamp,
       JSON.stringify(payload),
       err
     )
@@ -137,7 +180,7 @@ exports.handler = (event, context, callback) => {
       })
       .catch(err => {
         console.log('Failed to send slack message: ', err)
-        callback(err)
+        callback()
       })
   }
 }

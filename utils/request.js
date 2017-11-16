@@ -26,7 +26,7 @@ function post(options, body) {
       })
 
       res.on('end', function() {
-        response.data = JSON.parse(responseString)
+        response.data = responseString
         resolve(response)
       })
 

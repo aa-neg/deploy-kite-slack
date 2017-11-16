@@ -25,19 +25,16 @@ const sendSqsMessage = (url, message) => {
   })
 }
 
-const constructSuccessMessage = payload => {
-  console.log('our construct message payload recieved.', payload)
-  const messageDetails = JSON.parse(payload.callback_id)
+const constructSuccessMessage = messageDetails => {
   console.log('our message details: ', messageDetails)
-  console.log('the pipeline', messageDetails.pipeline)
   const baseMessage = {
     attachments: [
       {
         fallback: `Successfully redeployed`,
         color: '#05f2ff',
-        title: 'Sent redeploy.',
+        title: `Sent redeploy. ${messageDetails.timestamp}`,
         text: `Sent ${messageDetails.pipeline} ${messageDetails.buildnumber} to the redeploy queue.`,
-        callback_id: `${payload.callback_id}`
+        callback_id: `${JSON.stringify(messageDetails)}`
       }
     ]
   }
@@ -45,16 +42,15 @@ const constructSuccessMessage = payload => {
   return baseMessage
 }
 
-const constructErrorMessage = (payload, err) => {
-  const messageDetails = JSON.parse(payload.callback_id)
+const constructErrorMessage = (messageDetails, err) => {
   const baseMessage = {
     attachments: [
       {
         fallback: `Shit really went wrong in redeployment`,
         color: '#ffb805',
-        title: 'Failed to re-deploy!',
+        title: `Failed to re-deploy! ${messageDetails.timestamp}`,
         text: `This went wrong: ${err.toString()}`,
-        callback_id: `${payload.callback_id}`,
+        callback_id: `${JSON.stringify(messageDetails)}`,
         fields: [
           {
             title: 'Infrastructure Environment',
@@ -112,7 +108,7 @@ const postSlackMessage = (message, url, callback) => {
     })
     .catch(err => {
       console.log('sit went wrong posting to slack', err)
-      callback(err)
+      callback()
     })
 }
 
@@ -126,16 +122,12 @@ exports.handler = (event, context, callback) => {
   } else {
     const details = JSON.parse(payload.callback_id)
     console.log('our details: ', details)
-    console.log('our details parsed: ', details.pipeline)
-    console.log('our things: ', payload.response_url)
     const url = URL.parse(payload.response_url)
-    console.log('our url: ', url)
-    console.log('our url hostname: ', url.hostname)
-    console.log('our url path: ', url.pathname)
-    return sendSqsMessage(sqsQueueUrl, payload.callback_id)
+    details.redeployment = true
+    details.timestamp = new Date().getTime()
+    return sendSqsMessage(sqsQueueUrl, JSON.stringify(details))
       .then(result => {
-        console.log('things were successful')
-        return postSlackMessage(constructSuccessMessage(payload), url, callback)
+        return postSlackMessage(constructSuccessMessage(details), url, callback)
       })
       .catch(err => {
         console.log('shit went wrong: ', err)
